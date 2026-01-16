@@ -6,6 +6,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
+import ImageUploadModal from "@/components/ImageUploadModal";
 import { getRecordByIdFromAPI, deleteRecordFromAPI } from "@/lib/api";
 import { BorrowRecord } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
@@ -15,6 +16,9 @@ export default function DetailPage() {
   const router = useRouter();
   const [record, setRecord] = useState<BorrowRecord | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showBorrowImageModal, setShowBorrowImageModal] = useState(false);
+  const [showReturnImageModal, setShowReturnImageModal] = useState(false);
+  const [selectedReturnHistoryId, setSelectedReturnHistoryId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadRecord() {
@@ -41,6 +45,89 @@ export default function DetailPage() {
       console.error("Failed to delete record:", error);
       alert("เกิดข้อผิดพลาดในการลบ");
     }
+  };
+
+  const handleUploadBorrowImages = async (files: File[]) => {
+    if (!record) return;
+
+    // Upload files first
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+
+    const uploadRes = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!uploadRes.ok) {
+      throw new Error("Failed to upload images");
+    }
+
+    const uploadData = await uploadRes.json();
+    const imagePaths = uploadData.paths;
+
+    // Update record with new images
+    const updateRes = await fetch(`/api/records/${record.id}/images`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ borrowImages: imagePaths }),
+    });
+
+    if (!updateRes.ok) {
+      throw new Error("Failed to update record");
+    }
+
+    // Reload record
+    const updatedRecord = await getRecordByIdFromAPI(record.id);
+    if (updatedRecord) {
+      setRecord(updatedRecord);
+    }
+  };
+
+  const handleUploadReturnImages = async (files: File[]) => {
+    if (!record || !selectedReturnHistoryId) return;
+
+    // Upload files first
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+
+    const uploadRes = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!uploadRes.ok) {
+      throw new Error("Failed to upload images");
+    }
+
+    const uploadData = await uploadRes.json();
+    const imagePaths = uploadData.paths;
+
+    // Update return history with new images
+    const updateRes = await fetch(`/api/records/${record.id}/images`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        returnHistoryId: selectedReturnHistoryId,
+        returnImages: imagePaths,
+      }),
+    });
+
+    if (!updateRes.ok) {
+      throw new Error("Failed to update return history");
+    }
+
+    // Reload record
+    const updatedRecord = await getRecordByIdFromAPI(record.id);
+    if (updatedRecord) {
+      setRecord(updatedRecord);
+    }
+
+    setSelectedReturnHistoryId(null);
   };
 
   if (!record) {
@@ -137,6 +224,47 @@ export default function DetailPage() {
           )}
         </div>
 
+        {/* Borrow Images */}
+        <BlurFade delay={0.1}>
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <span>📷</span>
+                <span>รูปภาพหลักฐานการยืม</span>
+              </h3>
+              <button
+                onClick={() => setShowBorrowImageModal(true)}
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+              >
+                + เพิ่มรูป
+              </button>
+            </div>
+            {record.borrowImages && record.borrowImages.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {record.borrowImages.map((imagePath, index) => (
+                  <a
+                    key={index}
+                    href={imagePath}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block aspect-square bg-gray-100 rounded-lg overflow-hidden hover:ring-2 hover:ring-blue-500 transition-all"
+                  >
+                    <img
+                      src={imagePath}
+                      alt={`รูปภาพการยืม ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400 text-sm">
+                ยังไม่มีรูปภาพ
+              </div>
+            )}
+          </div>
+        </BlurFade>
+
         {/* Books Status Summary */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 shadow-lg text-white">
           <div className="flex justify-between items-center mb-4">
@@ -202,6 +330,49 @@ export default function DetailPage() {
                         </div>
                         <div className="text-xs text-green-800 bg-white rounded p-2">
                           เล่ม: {entry.booksReturned.join(", ")}
+                        </div>
+
+                        {/* Return Images */}
+                        <div className="pt-2 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs font-medium text-green-900">
+                              📷 รูปภาพหลักฐานการคืน
+                            </div>
+                            {entry.id && (
+                              <button
+                                onClick={() => {
+                                  setSelectedReturnHistoryId(entry.id || null);
+                                  setShowReturnImageModal(true);
+                                }}
+                                className="text-xs text-green-600 hover:text-green-700 font-medium"
+                              >
+                                + เพิ่มรูป
+                              </button>
+                            )}
+                          </div>
+                          {entry.returnImages && entry.returnImages.length > 0 ? (
+                            <div className="grid grid-cols-2 gap-2">
+                              {entry.returnImages.map((imagePath, imgIndex) => (
+                                <a
+                                  key={imgIndex}
+                                  href={imagePath}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block aspect-square bg-white rounded overflow-hidden hover:ring-2 hover:ring-green-500 transition-all"
+                                >
+                                  <img
+                                    src={imagePath}
+                                    alt={`รูปภาพการคืนรอบที่ ${index + 1} (${imgIndex + 1})`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </a>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-4 text-gray-400 text-xs">
+                              ยังไม่มีรูปภาพ
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -290,6 +461,24 @@ export default function DetailPage() {
           </div>
         </div>
       )}
+
+      {/* Image Upload Modals */}
+      <ImageUploadModal
+        isOpen={showBorrowImageModal}
+        onClose={() => setShowBorrowImageModal(false)}
+        onUpload={handleUploadBorrowImages}
+        title="เพิ่มรูปภาพการยืม"
+      />
+
+      <ImageUploadModal
+        isOpen={showReturnImageModal}
+        onClose={() => {
+          setShowReturnImageModal(false);
+          setSelectedReturnHistoryId(null);
+        }}
+        onUpload={handleUploadReturnImages}
+        title="เพิ่มรูปภาพการคืน"
+      />
     </>
   );
 }

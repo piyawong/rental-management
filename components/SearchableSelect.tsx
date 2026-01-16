@@ -105,7 +105,7 @@ export default function SearchableSelect({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className={cn(
-          "w-full px-4 py-3 rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all cursor-pointer",
+          "w-full px-4 py-3 rounded-xl border bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all cursor-pointer",
           error ? "border-red-300" : "border-gray-200",
           !isOpen && value && "text-gray-900"
         )}
@@ -123,7 +123,7 @@ export default function SearchableSelect({
                 "px-4 py-3 cursor-pointer transition-colors",
                 index === highlightedIndex
                   ? "bg-blue-50 text-blue-700"
-                  : "hover:bg-gray-50",
+                  : "hover:bg-gray-50 text-gray-900",
                 value === option && "font-semibold text-blue-600"
               )}
             >

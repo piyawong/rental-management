@@ -64,6 +64,7 @@ export async function PATCH(
           booksReturned: body.newReturnHistoryEntry.booksReturned,
           count: body.newReturnHistoryEntry.count,
           date: new Date(body.newReturnHistoryEntry.date),
+          returnImages: body.newReturnHistoryEntry.returnImages || [],
         },
       });
     }

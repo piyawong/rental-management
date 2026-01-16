@@ -16,6 +16,8 @@ export default function ReturnPage() {
   const [record, setRecord] = useState<BorrowRecord | null>(null);
   const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
   const [notReturnedBooks, setNotReturnedBooks] = useState<string[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     async function loadRecord() {
@@ -55,25 +57,60 @@ export default function ReturnPage() {
     setSelectedBooks([]);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      setSelectedFiles((prev) => [...prev, ...filesArray]);
+    }
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleReturn = async () => {
     if (!record || selectedBooks.length === 0) return;
 
-    const currentReturnedBooks = record.returnedBooks || [];
-    const newReturnedBooks = [
-      ...currentReturnedBooks,
-      ...selectedBooks,
-    ];
-
-    const allReturned = newReturnedBooks.length === record.calculatedBooks.length;
-
-    // Create new return history entry
-    const newHistoryEntry = {
-      date: new Date(),
-      booksReturned: selectedBooks,
-      count: selectedBooks.length,
-    };
+    setUploading(true);
 
     try {
+      // Upload images first
+      let imagePaths: string[] = [];
+      if (selectedFiles.length > 0) {
+        const formData = new FormData();
+        selectedFiles.forEach((file) => {
+          formData.append("files", file);
+        });
+
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error("Failed to upload images");
+        }
+
+        const uploadData = await uploadRes.json();
+        imagePaths = uploadData.paths;
+      }
+
+      const currentReturnedBooks = record.returnedBooks || [];
+      const newReturnedBooks = [
+        ...currentReturnedBooks,
+        ...selectedBooks,
+      ];
+
+      const allReturned = newReturnedBooks.length === record.calculatedBooks.length;
+
+      // Create new return history entry with images
+      const newHistoryEntry = {
+        date: new Date(),
+        booksReturned: selectedBooks,
+        count: selectedBooks.length,
+        returnImages: imagePaths,
+      };
+
       await updateRecordInAPI(record.id, {
         returnedBooks: newReturnedBooks,
         newReturnHistoryEntry: newHistoryEntry,
@@ -86,6 +123,8 @@ export default function ReturnPage() {
     } catch (error) {
       console.error("Failed to update record:", error);
       alert("เกิดข้อผิดพลาดในการบันทึก");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -194,6 +233,51 @@ export default function ReturnPage() {
           </div>
         </div>
 
+        {/* Image Upload */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            รูปภาพหลักฐานการคืน{" "}
+            <span className="text-gray-400 font-normal">(ถ้ามี)</span>
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleFileChange}
+            className="hidden"
+            id="return-image-input"
+          />
+          <label
+            htmlFor="return-image-input"
+            className="flex items-center justify-center w-full px-4 py-3 rounded-xl border-2 border-dashed border-gray-300 hover:border-green-400 cursor-pointer transition-colors bg-gray-50 hover:bg-green-50"
+          >
+            <span className="text-gray-600">📷 เลือกรูปภาพ</span>
+          </label>
+
+          {/* Image Preview */}
+          {selectedFiles.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {selectedFiles.map((file, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2"
+                >
+                  <span className="text-sm text-gray-700 truncate flex-1">
+                    {file.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFile(index)}
+                    className="ml-2 text-red-500 hover:text-red-700 font-medium"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Actions */}
         <div className="space-y-3 pt-4">
           {selectedBooks.length > 0 ? (
@@ -202,8 +286,12 @@ export default function ReturnPage() {
               className="w-full text-base"
               background="rgb(22, 163, 74)"
               shimmerColor="#ffffff"
+              disabled={uploading}
             >
-              ✅ บันทึกการคืน ({selectedBooks.length} เล่ม)
+              {uploading
+                ? "⏳ กำลังอัพโหลด..."
+                : `✅ บันทึกการคืน (${selectedBooks.length} เล่ม)`
+              }
             </ShimmerButton>
           ) : (
             <button

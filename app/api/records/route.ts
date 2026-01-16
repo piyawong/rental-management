@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
         totalBooks: body.totalBooks,
         status: body.status,
         returnedBooks: body.returnedBooks || [],
+        borrowImages: body.borrowImages || [],
       },
       include: {
         returnHistory: true,

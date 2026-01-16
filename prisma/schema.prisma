@@ -25,6 +25,7 @@ model BorrowRecord {
   returnDate        DateTime?
   lastReturnDate    DateTime?
   returnedBooks     String[]            @default([])
+  borrowImages      String[]            @default([])  // Image paths for borrow evidence
 
   // Relations
   returnHistory     ReturnHistory[]
@@ -41,6 +42,7 @@ model ReturnHistory {
   date            DateTime      @default(now())
   booksReturned   String[]      // Books returned in this round
   count           Int
+  returnImages    String[]      @default([])  // Image paths for return evidence
 
   // Foreign key
   borrowRecordId  String

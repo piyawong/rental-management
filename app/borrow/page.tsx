@@ -28,6 +28,8 @@ export default function BorrowPage() {
   } | null>(null);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -43,6 +45,17 @@ export default function BorrowPage() {
         return newErrors;
       });
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      setSelectedFiles((prev) => [...prev, ...filesArray]);
+    }
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleCalculate = () => {
@@ -80,30 +93,57 @@ export default function BorrowPage() {
       return;
     }
 
-    const start = parseInt(formData.startNumber);
-    const end = parseInt(formData.endNumber);
-
-    const record = {
-      date: new Date(),
-      organizationType: formData.organizationType,
-      district: formData.district,
-      startNumber: start,
-      endNumber: end,
-      missingNumbers: formData.missingNumbers,
-      duplicateNumbers: formData.duplicateNumbers,
-      calculatedBooks: preview.books,
-      totalBooks: preview.total,
-      status: "borrowed" as const,
-      returnedBooks: [],
-      returnHistory: [],
-    };
+    setUploading(true);
 
     try {
+      // Upload images first
+      let imagePaths: string[] = [];
+      if (selectedFiles.length > 0) {
+        const formData = new FormData();
+        selectedFiles.forEach((file) => {
+          formData.append("files", file);
+        });
+
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error("Failed to upload images");
+        }
+
+        const uploadData = await uploadRes.json();
+        imagePaths = uploadData.paths;
+      }
+
+      // Save record with image paths
+      const start = parseInt(formData.startNumber);
+      const end = parseInt(formData.endNumber);
+
+      const record = {
+        date: new Date(),
+        organizationType: formData.organizationType,
+        district: formData.district,
+        startNumber: start,
+        endNumber: end,
+        missingNumbers: formData.missingNumbers,
+        duplicateNumbers: formData.duplicateNumbers,
+        calculatedBooks: preview.books,
+        totalBooks: preview.total,
+        status: "borrowed" as const,
+        returnedBooks: [],
+        returnHistory: [],
+        borrowImages: imagePaths,
+      };
+
       await saveRecordToAPI(record);
       router.push("/");
     } catch (error) {
       console.error("Failed to save record:", error);
       alert("เกิดข้อผิดพลาดในการบันทึก");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -176,7 +216,7 @@ export default function BorrowPage() {
               placeholder="เช่น 1"
               className={`w-full px-4 py-3 rounded-xl border ${
                 errors.startNumber ? "border-red-300" : "border-gray-200"
-              } focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all`}
+              } bg-white text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all`}
             />
             {errors.startNumber && (
               <p className="text-red-500 text-sm mt-1">{errors.startNumber}</p>
@@ -195,7 +235,7 @@ export default function BorrowPage() {
               placeholder="เช่น 30"
               className={`w-full px-4 py-3 rounded-xl border ${
                 errors.endNumber ? "border-red-300" : "border-gray-200"
-              } focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all`}
+              } bg-white text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all`}
             />
             {errors.endNumber && (
               <p className="text-red-500 text-sm mt-1">{errors.endNumber}</p>
@@ -215,7 +255,7 @@ export default function BorrowPage() {
             value={formData.missingNumbers}
             onChange={handleChange}
             placeholder="เช่น 2,3,9"
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
           />
           <p className="text-xs text-gray-500 mt-1">
             คั่นด้วยเครื่องหมาย , (Comma)
@@ -234,11 +274,56 @@ export default function BorrowPage() {
             value={formData.duplicateNumbers}
             onChange={handleChange}
             placeholder="เช่น 12.1,12.3"
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
           />
           <p className="text-xs text-gray-500 mt-1">
             คั่นด้วยเครื่องหมาย , (Comma)
           </p>
+        </div>
+
+        {/* Image Upload */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            รูปภาพหลักฐาน{" "}
+            <span className="text-gray-400 font-normal">(ถ้ามี)</span>
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleFileChange}
+            className="hidden"
+            id="borrow-image-input"
+          />
+          <label
+            htmlFor="borrow-image-input"
+            className="flex items-center justify-center w-full px-4 py-3 rounded-xl border-2 border-dashed border-gray-300 hover:border-blue-400 cursor-pointer transition-colors bg-gray-50 hover:bg-blue-50"
+          >
+            <span className="text-gray-600">📷 เลือกรูปภาพ</span>
+          </label>
+
+          {/* Image Preview */}
+          {selectedFiles.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {selectedFiles.map((file, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2"
+                >
+                  <span className="text-sm text-gray-700 truncate flex-1">
+                    {file.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFile(index)}
+                    className="ml-2 text-red-500 hover:text-red-700 font-medium"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Calculate Button */}
@@ -263,7 +348,7 @@ export default function BorrowPage() {
             </div>
             <div className="text-sm text-blue-800">
               <div className="font-medium mb-1">เล่มที่:</div>
-              <div className="bg-white rounded-lg p-3 max-h-32 overflow-y-auto text-xs">
+              <div className="bg-white rounded-lg p-3 max-h-32 overflow-y-auto text-xs text-blue-900">
                 {preview.books.join(", ")}
               </div>
             </div>
@@ -277,8 +362,9 @@ export default function BorrowPage() {
             className="w-full text-base"
             background="rgb(37, 99, 235)"
             shimmerColor="#ffffff"
+            disabled={uploading}
           >
-            ✅ บันทึกการยืม
+            {uploading ? "⏳ กำลังอัพโหลด..." : "✅ บันทึกการยืม"}
           </ShimmerButton>
         ) : (
           <button

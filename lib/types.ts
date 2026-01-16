@@ -1,9 +1,11 @@
 export type OrganizationType = "มูลนิธิ" | "สมาคม";
 
 export interface ReturnHistoryEntry {
+  id?: string; // return history ID for updating
   date: Date;
   booksReturned: string[]; // books returned in this round
   count: number;
+  returnImages?: string[]; // image paths for return evidence
 }
 
 export interface BorrowRecord {
@@ -22,6 +24,7 @@ export interface BorrowRecord {
   lastReturnDate?: Date;
   returnedBooks: string[]; // all books that were returned
   returnHistory: ReturnHistoryEntry[]; // history of each return round
+  borrowImages?: string[]; // image paths for borrow evidence
 }
 
 export interface BorrowFormData {
