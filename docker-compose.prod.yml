@@ -1,5 +1,24 @@
 # Production mode - Optimized build with Dockerfile
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: rental_management_db_prod
+    environment:
+      POSTGRES_USER: rental_user
+      POSTGRES_PASSWORD: rental_pass
+      POSTGRES_DB: rental_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    networks:
+      - rental_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rental_user -d rental_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   nextjs:
     build:
       context: .
@@ -9,9 +28,16 @@ services:
       - "3005:3000"
     environment:
       - NODE_ENV=production
+      - DATABASE_URL=postgresql://rental_user:rental_pass@db:5432/rental_db?schema=public
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - rental_network
+
+volumes:
+  postgres_data_prod:
 
 networks:
   rental_network:

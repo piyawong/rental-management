@@ -6,7 +6,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
-import { getRecordById, deleteRecord } from "@/lib/storage";
+import { getRecordByIdFromAPI, deleteRecordFromAPI } from "@/lib/api";
 import { BorrowRecord } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
@@ -17,17 +17,30 @@ export default function DetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
-    const id = params.id as string;
-    const foundRecord = getRecordById(id);
-    if (foundRecord) {
-      setRecord(foundRecord);
+    async function loadRecord() {
+      try {
+        const id = params.id as string;
+        const foundRecord = await getRecordByIdFromAPI(id);
+        if (foundRecord) {
+          setRecord(foundRecord);
+        }
+      } catch (error) {
+        console.error("Failed to load record:", error);
+      }
     }
+
+    loadRecord();
   }, [params.id]);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!record) return;
-    deleteRecord(record.id);
-    router.push("/");
+    try {
+      await deleteRecordFromAPI(record.id);
+      router.push("/");
+    } catch (error) {
+      console.error("Failed to delete record:", error);
+      alert("เกิดข้อผิดพลาดในการลบ");
+    }
   };
 
   if (!record) {

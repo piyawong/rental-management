@@ -1,0 +1,52 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model BorrowRecord {
+  id                String              @id @default(cuid())
+  date              DateTime            @default(now())
+  organizationType  String              // "มูลนิธิ" | "สมาคม"
+  district          String
+  startNumber       Int
+  endNumber         Int
+  missingNumbers    String              @default("")
+  duplicateNumbers  String              @default("")
+  calculatedBooks   String[]            // Array of book numbers
+  totalBooks        Int
+  status            String              // "borrowed" | "partially_returned" | "returned"
+  returnDate        DateTime?
+  lastReturnDate    DateTime?
+  returnedBooks     String[]            @default([])
+
+  // Relations
+  returnHistory     ReturnHistory[]
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([status])
+  @@index([date])
+}
+
+model ReturnHistory {
+  id              String        @id @default(cuid())
+  date            DateTime      @default(now())
+  booksReturned   String[]      // Books returned in this round
+  count           Int
+
+  // Foreign key
+  borrowRecordId  String
+  borrowRecord    BorrowRecord  @relation(fields: [borrowRecordId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime      @default(now())
+
+  @@index([borrowRecordId])
+}

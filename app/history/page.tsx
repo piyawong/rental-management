@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
-import { getAllRecords } from "@/lib/storage";
+import { getAllRecordsFromAPI } from "@/lib/api";
 import { BorrowRecord } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
@@ -12,10 +12,17 @@ export default function HistoryPage() {
   const [filter, setFilter] = useState<"all" | "borrowed" | "returned">("all");
 
   useEffect(() => {
-    const allRecords = getAllRecords();
-    // Sort by date descending
-    allRecords.sort((a, b) => b.date.getTime() - a.date.getTime());
-    setRecords(allRecords);
+    async function loadRecords() {
+      try {
+        const allRecords = await getAllRecordsFromAPI();
+        // Sort by date descending (already sorted from API)
+        setRecords(allRecords);
+      } catch (error) {
+        console.error("Failed to load records:", error);
+      }
+    }
+
+    loadRecords();
   }, []);
 
   const filteredRecords = records.filter((record) => {

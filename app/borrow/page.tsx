@@ -8,8 +8,8 @@ import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { bangkokDistricts } from "@/lib/districts";
 import { calculateBorrowedBooks } from "@/lib/utils";
-import { saveRecord } from "@/lib/storage";
-import { BorrowFormData, OrganizationType, BorrowRecord } from "@/lib/types";
+import { saveRecordToAPI } from "@/lib/api";
+import { BorrowFormData, OrganizationType } from "@/lib/types";
 
 export default function BorrowPage() {
   const router = useRouter();
@@ -74,7 +74,7 @@ export default function BorrowPage() {
     setPreview(result);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!preview) {
       handleCalculate();
       return;
@@ -83,8 +83,7 @@ export default function BorrowPage() {
     const start = parseInt(formData.startNumber);
     const end = parseInt(formData.endNumber);
 
-    const record: BorrowRecord = {
-      id: Date.now().toString(),
+    const record = {
       date: new Date(),
       organizationType: formData.organizationType,
       district: formData.district,
@@ -94,13 +93,18 @@ export default function BorrowPage() {
       duplicateNumbers: formData.duplicateNumbers,
       calculatedBooks: preview.books,
       totalBooks: preview.total,
-      status: "borrowed",
+      status: "borrowed" as const,
       returnedBooks: [],
       returnHistory: [],
     };
 
-    saveRecord(record);
-    router.push("/");
+    try {
+      await saveRecordToAPI(record);
+      router.push("/");
+    } catch (error) {
+      console.error("Failed to save record:", error);
+      alert("เกิดข้อผิดพลาดในการบันทึก");
+    }
   };
 
   return (

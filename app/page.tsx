@@ -5,7 +5,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
-import { getAllRecords } from "@/lib/storage";
+import { getAllRecordsFromAPI } from "@/lib/api";
 import { BorrowRecord } from "@/lib/types";
 import { formatShortDate } from "@/lib/utils";
 
@@ -19,31 +19,39 @@ export default function Home() {
   });
 
   useEffect(() => {
-    const allRecords = getAllRecords();
-    setRecords(allRecords.slice(0, 5)); // Show only 5 recent records
+    async function loadRecords() {
+      try {
+        const allRecords = await getAllRecordsFromAPI();
+        setRecords(allRecords.slice(0, 5)); // Show only 5 recent records
 
-    const borrowed = allRecords.filter(
-      (r) => r.status === "borrowed" || r.status === "partially_returned"
-    ).length;
-    const returned = allRecords.filter((r) => r.status === "returned").length;
+        const borrowed = allRecords.filter(
+          (r) => r.status === "borrowed" || r.status === "partially_returned"
+        ).length;
+        const returned = allRecords.filter((r) => r.status === "returned").length;
 
-    // Count total books not yet returned
-    const totalBooks = allRecords
-      .filter((r) => r.status === "borrowed" || r.status === "partially_returned")
-      .reduce((sum, r) => {
-        const returnedBooks = r.returnedBooks || [];
-        const notReturned = r.calculatedBooks.filter(
-          (book) => !returnedBooks.includes(book)
-        );
-        return sum + notReturned.length;
-      }, 0);
+        // Count total books not yet returned
+        const totalBooks = allRecords
+          .filter((r) => r.status === "borrowed" || r.status === "partially_returned")
+          .reduce((sum, r) => {
+            const returnedBooks = r.returnedBooks || [];
+            const notReturned = r.calculatedBooks.filter(
+              (book) => !returnedBooks.includes(book)
+            );
+            return sum + notReturned.length;
+          }, 0);
 
-    setStats({
-      total: allRecords.length,
-      borrowed,
-      returned,
-      totalBooks,
-    });
+        setStats({
+          total: allRecords.length,
+          borrowed,
+          returned,
+          totalBooks,
+        });
+      } catch (error) {
+        console.error("Failed to load records:", error);
+      }
+    }
+
+    loadRecords();
   }, []);
 
   return (

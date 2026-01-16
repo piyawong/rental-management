@@ -6,7 +6,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { BlurFade } from "@/components/ui/blur-fade";
-import { getRecordById, updateRecord } from "@/lib/storage";
+import { getRecordByIdFromAPI, updateRecordInAPI } from "@/lib/api";
 import { BorrowRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -18,19 +18,27 @@ export default function ReturnPage() {
   const [notReturnedBooks, setNotReturnedBooks] = useState<string[]>([]);
 
   useEffect(() => {
-    const id = params.id as string;
-    const foundRecord = getRecordById(id);
-    if (foundRecord) {
-      setRecord(foundRecord);
-      // Books that haven't been returned yet
-      const returnedBooks = foundRecord.returnedBooks || [];
-      const notReturned = foundRecord.calculatedBooks.filter(
-        (book) => !returnedBooks.includes(book)
-      );
-      setNotReturnedBooks(notReturned);
-      // Pre-select all not returned books
-      setSelectedBooks(notReturned);
+    async function loadRecord() {
+      try {
+        const id = params.id as string;
+        const foundRecord = await getRecordByIdFromAPI(id);
+        if (foundRecord) {
+          setRecord(foundRecord);
+          // Books that haven't been returned yet
+          const returnedBooks = foundRecord.returnedBooks || [];
+          const notReturned = foundRecord.calculatedBooks.filter(
+            (book) => !returnedBooks.includes(book)
+          );
+          setNotReturnedBooks(notReturned);
+          // Pre-select all not returned books
+          setSelectedBooks(notReturned);
+        }
+      } catch (error) {
+        console.error("Failed to load record:", error);
+      }
     }
+
+    loadRecord();
   }, [params.id]);
 
   const toggleBook = (book: string) => {
@@ -47,7 +55,7 @@ export default function ReturnPage() {
     setSelectedBooks([]);
   };
 
-  const handleReturn = () => {
+  const handleReturn = async () => {
     if (!record || selectedBooks.length === 0) return;
 
     const currentReturnedBooks = record.returnedBooks || [];
@@ -59,22 +67,26 @@ export default function ReturnPage() {
     const allReturned = newReturnedBooks.length === record.calculatedBooks.length;
 
     // Create new return history entry
-    const currentHistory = record.returnHistory || [];
     const newHistoryEntry = {
       date: new Date(),
       booksReturned: selectedBooks,
       count: selectedBooks.length,
     };
 
-    updateRecord(record.id, {
-      returnedBooks: newReturnedBooks,
-      returnHistory: [...currentHistory, newHistoryEntry],
-      status: allReturned ? "returned" : "partially_returned",
-      lastReturnDate: new Date(),
-      returnDate: allReturned ? new Date() : record.returnDate,
-    });
+    try {
+      await updateRecordInAPI(record.id, {
+        returnedBooks: newReturnedBooks,
+        newReturnHistoryEntry: newHistoryEntry,
+        status: allReturned ? "returned" : "partially_returned",
+        lastReturnDate: new Date(),
+        returnDate: allReturned ? new Date() : record.returnDate,
+      });
 
-    router.push(`/detail/${record.id}`);
+      router.push(`/detail/${record.id}`);
+    } catch (error) {
+      console.error("Failed to update record:", error);
+      alert("เกิดข้อผิดพลาดในการบันทึก");
+    }
   };
 
   if (!record) {
