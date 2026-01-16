@@ -1,0 +1,18 @@
+# Production mode - Optimized build with Dockerfile
+services:
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rental_management_prod
+    ports:
+      - "3005:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - rental_network
+
+networks:
+  rental_network:
+    driver: bridge

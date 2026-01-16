@@ -1,0 +1,22 @@
+# Development mode - Hot reload with volume mounting
+services:
+  nextjs:
+    image: node:22-alpine
+    container_name: rental_management_dev
+    working_dir: /app
+    ports:
+      - "3005:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+    command: sh -c "npm install && npm run dev"
+    restart: unless-stopped
+    networks:
+      - rental_network
+
+networks:
+  rental_network:
+    driver: bridge
